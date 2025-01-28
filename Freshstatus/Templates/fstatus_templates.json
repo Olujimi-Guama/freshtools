@@ -1,0 +1,82 @@
+{
+  "template_id": 1,
+  "template_name": "TRAX Release",
+  "type": "maintenance",
+  "title": "TRAX Release {rel_ver}",
+  "description": "We wanted to inform you that we are scheduling a maintenance window for our TRAX application, Release {rel_ver}. This maintenance is essential to address identified defects and enhance the overall user experience.\n\nDuring this scheduled maintenance period, the TRAX application will be temporarily unavailable. We apologize for any inconvenience this may cause and assure you that our team will work diligently to minimize downtime.\n\nReason for Maintenance:\n\nAddressing Defects: Our team will be resolving identified defects to ensure smoother functionality.\nEnhancing User Experience: We are implementing updates aimed at enhancing the overall user experience and improving performance.\n\nWe appreciate your understanding and cooperation during this maintenance period. Should you have any urgent concerns or queries, please feel free to contact our support team through the helpdesk support portal.\n\nThank you for your patience and continued support.\n\nSincerely,\n\nKore Solutions",
+  "is_auto_start": true,
+  "is_auto_end": true,
+  "is_private": false,
+  "account": {
+    "kore": {
+      "name": "KORE (main)",
+      "source": 1,
+      "affected_components": [
+        {
+          "component": "20695",
+          "new_status": "UM"
+        },
+        {
+          "component": "20696",
+          "new_status": "UM"
+        },
+        {
+          "component": "20697",
+          "new_status": "UM"
+        }
+      ]
+    },
+    "hts-texas": {
+      "name": "HTS Texas",
+      "source": 1,
+      "affected_components": [
+        {
+          "component": "247173", 
+          "new_status": "OP"
+      }, 
+        {"component": "247174", 
+          "new_status": "OP"
+      }, 
+        {"component": "247175", 
+          "new_status": "OP"    
+        }, 
+        {"component": "247176", 
+          "new_status": "OP"
+        }, 
+        {"component": "247177", 
+          "new_status": "OP"
+        }, 
+        {"component": "247178", 
+          "new_status": "OP"
+        }, 
+        {"component": "247179", 
+          "new_status": "OP"
+        }, 
+        {"component": "247180", 
+          "new_status": "OP"
+        },
+        {"component": "247181", 
+          "new_status": "OP"
+        }, 
+        {"component": "247182", 
+          "new_status": "OP"
+        }, 
+        {"component": "247183", 
+          "new_status": "OP"
+        }, 
+        {"component": "247184", 
+          "new_status": "OP"
+        }
+      ]
+    }
+  },
+  "notification_options": {
+    "send_notification": true,
+    "send_tweet": true,
+    "email_before_one_hour": false,
+    "email_before_day_hour": false,
+    "email_on_start": true,
+    "email_on_complete": true
+  },
+  "maintenance_updates": []
+}
