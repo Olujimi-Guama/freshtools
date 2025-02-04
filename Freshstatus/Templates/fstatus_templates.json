@@ -78,5 +78,21 @@
     "email_on_start": true,
     "email_on_complete": true
   },
-  "maintenance_updates": []
+  "maintenance_updates": [],
+  "teams_integrated": 
+    {
+      "ϕcomment": "tenant_id: is the .webhook file name that holds the dictionary of teams webhooks",
+      "tenant_id": "htseng",
+      "teams_name": "KORE Support",    
+      "teams_message": {
+        "Title" : "TRAX Release {rel_ver} (HTS ON+, HTS Texas, Kehoe, AirCom and EJS)",
+        "TRAX Release": "{rel_ver}",
+        "Deployment Status": "Staged",
+        "Deployment Date": "{date}",
+        "Time": "{time}",
+        "Development Resource": "tbd",
+        "QC Resources": "tbd",
+        "Notes" : "Thank you everyone for all your efforts and hard work!"
+      }
+    }
 }
