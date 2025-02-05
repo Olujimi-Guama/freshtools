@@ -3,12 +3,13 @@ import os
 import json
 import pytz
 import tzlocal
+import pymsteams
 from datetime import datetime, timedelta, timezone, time
 from _freshstatus_api import is_debug_mode, is_dry_run_mode, make_api_request
 
 # Global variables
 os.environ['DEBUG'] = 'True'
-os.environ['DRY_RUN'] = 'True'
+#os.environ['DRY_RUN'] = 'True'
 
 def get_user_timezone():
     """Get the user's local timezone. Default to EST if not detected."""
@@ -96,10 +97,10 @@ def prompt_for_times():
     
     return start_iso, end_iso
 
-def get_webhook_url(acct: str, team_name: str) -> str:
+def get_webhook_url(acct: str, webhook_name: str) -> str:
     """Read the webhook URL for the specified team from the JSON file."""
     
-    print(f"Getting webhook for account: {acct}, team: {team_name}")
+    print(f"Getting \'{webhook_name}\' webhook for \'{acct}\' account...")
     webhook_path = os.path.join(os.path.expanduser('~'), '.secrets', f'freshstatus_{acct}.webhook')
     
     try:
@@ -107,18 +108,51 @@ def get_webhook_url(acct: str, team_name: str) -> str:
             webhooks = json.load(file)
         
         for webhook in webhooks:
-            if webhook['teams_name'] == team_name:
+            if webhook['webhook_name'] == webhook_name:
                 return webhook['teams_webhook']
         
         # If no matching team name is found
-        raise ValueError(f"No webhook found for team: {team_name}")
+        raise ValueError(f"No webhook found for team: {webhook_name}")
     
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Error: Webhooks file '{webhook_path}' not found.")
-    except json.JSONDecodeError:
-        raise ValueError(f"Error: Failed to decode JSON from '{webhook_path}'.")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        raise ValueError(f"Error: {str(e)}")
 
-        
+def get_teams_message_input(tmssg):
+    tmssg['Title'] = input(f"Enter the message to be sent to the Teams channel\n(default \"{tmssg['Title']}\"): ") or tmssg['Title']
+    tmssg['Deployment Status'] = input(f"Enter the deployment status\n(default \"{tmssg['Deployment Status']}\"): ") or tmssg['Deployment Status']
+    tmssg['Development Resource'] = input(f"Enter the development resource\n(default \"{tmssg['Development Resource']}\"): ") or tmssg['Development Resource']
+    tmssg['QC Resources'] = input(f"Enter the QC resources\n(default \"{tmssg['QC Resources']}\"): ") or tmssg['QC Resources']
+    tmssg['Notes'] = input(f"Enter any additional notes\n(default \"{tmssg['Notes']}\"): ") or tmssg['Notes']
+    return tmssg
+
+def format_teams_message(myteams, tmssg, rel_ver, start_iso):
+    datestamp = datetime.fromisoformat(start_iso)
+    date = datestamp.strftime("%A, %b %d, %Y")
+    time = datestamp.strftime("%I:%M %p").lower()
+    date = date.replace(" 0", " ")
+    time = time.lstrip("0")
+
+    myteams.title(f"{tmssg['Title']}")
+    myteams.text(
+        f"Release: **{rel_ver}**<br>"
+        f"Deployment Status: **{tmssg['Deployment Status']}**<br>"
+        f"Deployment Date: **{date}**<br>"
+        f"Time: **{time}**<br>"
+        f"Development Resource: **{tmssg['Development Resource']}**<br>"
+        f"QC Resources: **{tmssg['QC Resources']}**<br><br>"
+        f"{tmssg['Notes']}<br>"
+    )
+
+def process_teams_message(template, rel_ver, start_iso):
+    myteams = pymsteams.connectorcard(get_webhook_url(template['teams_integrated']['tenant_id'], template['teams_integrated']['webhook_name']))
+    tmssg = template['teams_integrated']['teams_message']
+    tmssg['Title'] = tmssg['Title'].format(rel_ver=rel_ver)
+
+    tmssg = get_teams_message_input(tmssg)
+    format_teams_message(myteams, tmssg, rel_ver, start_iso)
+
+    return myteams, tmssg
+
 def create_maintenance():
     try:
         rel_ver = input("Enter the TRAX Release version being scheduled: ")
@@ -159,25 +193,29 @@ def create_maintenance():
             print(f"The following account{'s' if len(removed_accounts) > 1 else ''} "
                   f"have been removed from this maintenance: {removed_accounts_str}")
 
-        while True:
-            # Prompt user to adjust default times or use next Sunday by default
-            start_iso, end_iso = prompt_for_times()
+        # Prompt user to adjust default times or use next Sunday by default
+        use_default_times = input("Do you want to use the default times (next Sunday 06:00 AM to 12:00 PM)? (yes/no): ").strip().lower()
+        if use_default_times == 'yes':
+            start_iso, end_iso = get_next_day('Sunday', time(6, 0), time(12, 0))
+        else:
+            while True:
+                start_iso, end_iso = prompt_for_times()
 
-            # Convert ISO 8601 UTC to local timezone for display
-            start_local = convert_from_iso_format(start_iso)
-            end_local = convert_from_iso_format(end_iso)
+                # Convert ISO 8601 UTC to local timezone for display
+                start_local = convert_from_iso_format(start_iso)
+                end_local = convert_from_iso_format(end_iso)
 
-            start_server = convert_from_iso_format(start_iso, tz_name='America/New_York')
-            end_server = convert_from_iso_format(end_iso, tz_name='America/New_York')
+                start_server = convert_from_iso_format(start_iso, tz_name='America/New_York')
+                end_server = convert_from_iso_format(end_iso, tz_name='America/New_York')
 
-            # Validate that end time is after start time
-            if end_iso <= start_iso:
-                print("Error: End time entered cannot be earlier than set start time. Please enter valid times.")
-                retry_choice = input("Would you like to retry entering the times? (yes/no): ").strip().lower()
-                if retry_choice != 'yes':
-                    return
-            else:
-                break
+                # Validate that end time is after start time
+                if end_iso <= start_iso:
+                    print("Error: End time entered cannot be earlier than set start time. Please enter valid times.")
+                    retry_choice = input("Would you like to retry entering the times? (yes/no): ").strip().lower()
+                    if retry_choice != 'yes':
+                        return
+                else:
+                    break
 
         # Display summary and ask for confirmation
         summary_state_test = "DRY RUN MODE ACTIVE " if is_dry_run_mode() else ""
@@ -196,46 +234,14 @@ def create_maintenance():
         )
 
         if 'teams_integrated' in template:
-            
-            import pymsteams
-            
-            datestamp = datetime.fromisoformat(start_iso)
-            
-            date = datestamp.strftime("%A, %b %d, %Y")
-            time = datestamp.strftime("%I:%M %p").lower()
+            myteams, tmssg = process_teams_message(template, rel_ver, start_iso)
 
-            date = date.replace(" 0", " ")
-            time = time.lstrip("0")
-
-            myteams = pymsteams.connectorcard(get_webhook_url(template['teams_integrated']['tenant_id'], template['teams_integrated']['teams_name']))
-            tmssg = template['teams_integrated']['teams_message']
-            tmssg['Title'] = tmssg['Title'].format(rel_ver=rel_ver)
-            
-            
-            tmssg['Title'] = input(f"Enter the message to be sent to the Teams channel\n(default \"{tmssg['Title']}\"): ") or tmssg['Title']
-            tmssg['Deployment Status'] = input(f"Enter the deployment status\n(default \"{tmssg['Deployment Status']}\"): ") or tmssg['Deployment Status']
-            tmssg['Development Resource'] = input(f"Enter the development resource\n(default \"{tmssg['Development Resource']}\"): ") or tmssg['Development Resource']
-            tmssg['QC Resources'] = input(f"Enter the QC resources\n(default \"{tmssg['QC Resources']}\"): ") or tmssg['QC Resources']    
-            tmssg['Notes'] = input(f"Enter any additional notes\n(default \"{tmssg['Notes']}\"): ") or tmssg['Notes']
-            
-            myteams.title(f"{tmssg['Title']}")
-            myteams.text( 
-                f"Release: **{rel_ver}**<br>"
-                f"Deployment Status: **{tmssg['Deployment Status']}**<br>" 
-                f"Deployment Date: **{date}**<br>"
-                f"Time: **{time}**<br>"
-                f"Development Resource: **{tmssg['Development Resource']}**<br>"
-                f"QC Resources: **{tmssg['QC Resources']}**<br><br>"
-                f"{tmssg['Notes']}<br>"                
-                )
-            
-            summary_message += f"Teams Channel: {template['teams_integrated']['teams_name']}\n"
+            summary_message += f"Webhook Name: {template['teams_integrated']['webhook_name']}\n"
             summary_message += f"Teams Message: {tmssg['Title']}\n"
             summary_message += f"Deployment Status: {tmssg['Deployment Status']}\n"
             summary_message += f"Development Resource: {tmssg['Development Resource']}\n"
             summary_message += f"QC Resources: {tmssg['QC Resources']}\n"
             summary_message += f"Notes: {tmssg['Notes']}\n"
-            
         else:
             summary_message += f"Teams Channel: None configured\n"
 
@@ -248,8 +254,10 @@ def create_maintenance():
             print("Maintenance posting cancelled.")
             return
         
-        if is_debug_mode(): print(myteams.payload)
-        if not is_dry_run_mode: 
+        if is_debug_mode(): 
+            print(myteams.payload)
+
+        if not is_dry_run_mode(): 
             myteams.send()
         
         # Loop through the remaining accounts and post the maintenance
@@ -283,10 +291,14 @@ def create_maintenance():
             # Add the array from template["account"][acct] to the payload
             payload.update(template["account"][acct])
 
-            if is_dry_run_mode():
+            if is_debug_mode():
                 # Display the payload in JSON format for debugging
                 print("Debugging mode enabled. The payload is displayed below:")
                 print(json.dumps(payload, indent=4))
+            
+            if is_dry_run_mode():
+                # Display the payload in JSON format for debugging
+                print("Test mode enabled. The payload will not be sent.")
             else:
                 # Send the POST request using make_api_request
                 response = make_api_request(resource='maintenance/', mode='POST', acct=acct, payload=payload)

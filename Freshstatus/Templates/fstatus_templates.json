@@ -83,7 +83,7 @@
     {
       "ϕcomment": "tenant_id: is the .webhook file name that holds the dictionary of teams webhooks",
       "tenant_id": "htseng",
-      "teams_name": "KORE Support",    
+      "webhook_name": "StatusPublisher",    
       "teams_message": {
         "Title" : "TRAX Release {rel_ver} (HTS ON+, HTS Texas, Kehoe, AirCom and EJS)",
         "TRAX Release": "{rel_ver}",
